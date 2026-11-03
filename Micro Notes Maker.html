@@ -1,0 +1,387 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Micro Notes Maker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;600&family=Roboto+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: black-and-white control rail (editor, colour, images, typography) beside true-size A4 paper that reflows into pages. */
+:root{
+  --bg:#ffffff; --panel:#ffffff; --fg:#000000; --muted:#555555; --line:#111111; --soft:#e6e6e6;
+  --accent:#000000; --accent-fg:#ffffff; --stage:#d4d4d4;
+  --ui:'IBM Plex Sans',system-ui,sans-serif; --mono:'Roboto Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#000000; --panel:#000000; --fg:#ffffff; --muted:#aaaaaa; --line:#eeeeee; --soft:#222222;
+  --accent:#ffffff; --accent-fg:#000000; --stage:#1c1c1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000; --panel:#000000; --fg:#ffffff; --muted:#aaaaaa; --line:#eeeeee; --soft:#222222;
+  --accent:#ffffff; --accent-fg:#000000; --stage:#1c1c1c; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:14px;
+  padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:600;text-wrap:balance}
+.stats{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.app{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:900px){.app{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+h2{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:6px 10px}
+button:hover{background:var(--soft)}
+button.primary{background:var(--accent);color:var(--accent-fg);font-weight:600}
+button.primary:hover{opacity:.85}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+textarea{width:100%;height:240px;resize:vertical;font-family:var(--mono);font-size:12.5px;line-height:1.5;background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:10px}
+.hint{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+.hint code{font-family:var(--mono);font-size:11.5px}
+.row{display:grid;grid-template-columns:110px minmax(0,1fr) 46px;gap:8px;align-items:center}
+.row label{font-size:13px}
+.row output{font-family:var(--mono);font-size:12px;text-align:right;color:var(--muted)}
+select,input[type=range]{width:100%;min-width:0;accent-color:var(--fg)}
+select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:5px}
+input[type=color]{width:38px;height:32px;padding:2px;border:1px solid var(--line);background:var(--bg);cursor:pointer}
+.seg{display:flex;gap:4px}
+.seg button{flex:1;padding:5px 0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px}
+.chk input{accent-color:var(--fg)}
+.imgs{display:flex;flex-direction:column;gap:6px}
+.imgrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:12px}
+.imgrow img{width:44px;height:44px;object-fit:cover;border:1px solid var(--line)}
+.imgrow code{font-family:var(--mono);overflow:hidden;text-overflow:ellipsis}
+.imgrow select{width:auto}
+.stage{background:var(--stage);border:1px solid var(--line);padding:14px;overflow:auto;max-height:calc(100vh - 110px);min-width:0}
+@media(max-width:900px){.stage{max-height:none}}
+.viewbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.viewbar input[type=range]{max-width:160px}
+#pages{display:flex;flex-direction:column;gap:6px;width:210mm;transform-origin:top left}
+.pagewrap{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.pagewrap .cap{display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--fg)}
+.pagewrap .cap button{padding:3px 10px;font-size:12px}
+.page{width:210mm;height:297mm;background:#fff;color:#000;padding:var(--m);box-shadow:0 1px 6px rgba(0,0,0,.35)}
+.content{height:100%;overflow:hidden;column-count:var(--cols);column-gap:var(--gap);column-fill:auto;
+  font-family:var(--nf);font-size:var(--fs);line-height:var(--lh);color:#000;text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased}
+.cuts .content{column-rule:0.4px dashed #555}
+.content .u{margin:0 0 .25em;break-inside:auto;overflow-wrap:anywhere}
+.content .u.c{margin-top:0}
+.content .h{font-weight:700;margin-top:.2em;border-bottom:.4px solid #000}
+.content b{font-weight:700}
+.content mark{background:#ffe94d;color:#000}
+.content .im img{display:block;max-width:100%;height:auto}
+dialog{border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:14px;max-width:min(92vw,720px)}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog img{max-width:100%;max-height:60vh;display:block;margin:10px 0;background:#fff;border:1px solid var(--line)}
+.msg{font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.5}
+</style>
+
+<header>
+  <h1>Micro Notes Maker</h1>
+  <span class="stats" id="stats">Words: 0 | Pages: 1</span>
+</header>
+
+<div class="app">
+  <div class="panel">
+    <h2>Your notes</h2>
+    <div class="tools" role="toolbar" aria-label="Format selection">
+      <button type="button" data-w="**|**" title="Bold"><b>B</b></button>
+      <button type="button" data-w="==|==">Highlight</button>
+      <button type="button" data-h="1">Heading</button>
+      <button type="button" id="clear">Clear</button>
+    </div>
+    <div class="tools">
+      <input id="col" type="color" value="#1d4ed8" aria-label="Text colour">
+      <button type="button" id="applycol">Colour selected text</button>
+    </div>
+    <textarea id="src" spellcheck="false" aria-label="Paste your text here"></textarea>
+    <p class="hint">Paste text. One line = one note. Select words, then use the buttons. Markers: <code>**bold**</code> <code>==highlight==</code> <code>[c=#1d4ed8]colour[/c]</code> <code># heading</code></p>
+
+    <h2>Images</h2>
+    <div class="tools">
+      <input id="imgin" type="file" accept="image/*" multiple hidden>
+      <button type="button" id="imgbtn">Upload image</button>
+    </div>
+    <div class="imgs" id="imglist"></div>
+    <p class="hint">Each image is inserted at your cursor as <code>[img:1]</code>. Move or delete that line to place it.</p>
+
+    <h2>Columns and margins</h2>
+    <div class="row"><label>Columns</label>
+      <div class="seg" id="colseg"><button type="button" data-c="1">1</button><button type="button" data-c="2">2</button><button type="button" data-c="3">3</button><button type="button" data-c="4">4</button></div><output></output></div>
+    <div class="row"><label for="mar">Page margin</label><input id="mar" type="range" min="2" max="25" step="1" value="8"><output id="marO"></output></div>
+    <div class="row"><label for="gap">Column gap</label><input id="gap" type="range" min="1" max="12" step="0.5" value="3"><output id="gapO"></output></div>
+    <label class="chk"><input id="cuts" type="checkbox" checked> Dashed cut lines between columns</label>
+
+    <h2>Micro typography</h2>
+    <div class="row"><label for="ff">Font</label>
+      <select id="ff">
+        <option value="Arial, Helvetica, sans-serif">Arial (best for tiny sizes)</option>
+        <option value="Inter, Arial, sans-serif">Inter (clean)</option>
+        <option value="'Times New Roman', Times, serif">Times New Roman (dense)</option>
+        <option value="'Roboto Mono', monospace">Roboto Mono (math, code)</option>
+      </select><output></output></div>
+    <div class="row"><label for="fs">Font size</label><input id="fs" type="range" min="3" max="12" step="0.5" value="5"><output id="fsO"></output></div>
+    <div class="row"><label for="lh">Line spacing</label><input id="lh" type="range" min="0.9" max="1.6" step="0.05" value="1.1"><output id="lhO"></output></div>
+  </div>
+
+  <div>
+    <div class="viewbar">
+      <button type="button" class="primary" id="dlpdf">Download PDF (all pages)</button>
+      <button type="button" id="fit">Fit view</button>
+      <input id="zoom" type="range" min="0.3" max="1.5" step="0.05" value="0.8" aria-label="Zoom">
+      <span class="stats" id="zoomO"></span>
+      <span class="stats">A4 · 210 × 297 mm</span>
+    </div>
+    <div class="stage" id="stage"><div id="pages"></div></div>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <strong id="dtitle">Export</strong>
+  <img id="dimg" alt="Rendered notes page" hidden>
+  <p class="msg" id="dmsg"></p>
+  <div class="tools"><button type="button" class="primary" id="dobtn">Download</button><button type="button" id="copyimg">Copy image</button><button type="button" id="closed">Close</button></div>
+</dialog>
+
+<script>
+(function(){
+var SAMPLE = "# Newton's Laws\n**1st:** a body stays at rest or in uniform motion unless a net force acts (inertia). **2nd:** ==F = ma==, momentum p = mv, F = dp/dt. **3rd:** every action has an equal and opposite reaction on a different body.\n# Kinematics (constant a)\n[c=#1d4ed8]v = u + at[/c]  |  [c=#1d4ed8]s = ut + ½at²[/c]  |  [c=#1d4ed8]v² = u² + 2as[/c]  |  s = (u+v)t/2. Projectile: range R = u² sin2θ / g, max height H = u² sin²θ / 2g, time T = 2u sinθ / g.\n# Work, Energy, Power\nW = F·d cosθ. KE = ½mv². PE = mgh. Work-energy theorem: W_net = ΔKE. Power P = W/t = F·v. ==Conservation: total mechanical energy is constant when only conservative forces act.==\n# Circular Motion\nCentripetal a = v²/r = ω²r. F = mv²/r. ω = 2π/T. Banked road (no friction): tanθ = v²/rg.\n# Gravitation\nF = Gm₁m₂/r². g = GM/R². Escape velocity v = √(2gR) ≈ 11.2 km/s. Orbital velocity v = √(GM/r). Kepler: T² ∝ r³.\n# Thermodynamics\n**1st law:** ΔU = Q − W. Ideal gas PV = nRT. Isothermal: ΔU = 0. Adiabatic: Q = 0, PVᵞ = const. Carnot efficiency η = 1 − T₂/T₁. Entropy never decreases for an isolated system.\n# Electricity\nOhm's law V = IR. Power P = VI = I²R. Series R = R₁+R₂, parallel 1/R = 1/R₁+1/R₂. Coulomb F = kq₁q₂/r². Capacitor C = Q/V, energy U = ½CV². Kirchhoff: ΣI = 0 at a node, ΣV = 0 around a loop.\n# Waves and Optics\nv = fλ. Lens formula 1/v − 1/u = 1/f. Mirror 1/v + 1/u = 1/f. Snell n₁sinθ₁ = n₂sinθ₂. Critical angle sinC = 1/n. Young's double slit fringe width β = λD/d.\n# Modern Physics\nE = hf. de Broglie λ = h/p. Photoelectric: KEmax = hf − φ. Mass-energy E = mc². Radioactive decay N = N₀e^(−λt), half-life T½ = 0.693/λ.\n";
+
+var $ = function(id){return document.getElementById(id)};
+var src=$('src'), pagesEl=$('pages'), stage=$('stage');
+var cols=3, timer=null, images={}, nextImg=1;
+
+try{ var saved=localStorage.getItem('mn-text2'); src.value = saved!==null ? saved : SAMPLE; }catch(e){ src.value=SAMPLE; }
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function inline(s){
+  s=esc(s);
+  return s.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+     .replace(/==(.+?)==/g,'<mark>$1</mark>')
+     .replace(/\[c=(#[0-9a-fA-F]{3,8})\](.+?)\[\/c\]/g,'<span style="color:$1;font-weight:600">$2</span>');
+}
+function units(text){
+  var out=[];
+  text.split(/\r?\n/).forEach(function(line){
+    line=line.trim(); if(!line) return;
+    var m=line.match(/^\[img:(\d+)\]$/);
+    if(m){ if(images[m[1]]) out.push({img:m[1]}); return; }
+    if(/^#\s+/.test(line)){ out.push({h:1,html:inline(line.replace(/^#\s+/,''))}); return; }
+    if(line.length<=700){ out.push({html:inline(line)}); return; }
+    var parts=line.split(/(?<=[.!?])\s+/), buf='', first=true;
+    parts.forEach(function(p){
+      if((buf+' '+p).length>700 && buf){ out.push({html:inline(buf),c:!first}); first=false; buf=p; }
+      else buf = buf ? buf+' '+p : p;
+    });
+    if(buf) out.push({html:inline(buf),c:!first});
+  });
+  return out;
+}
+function newPage(idx){
+  var wrap=document.createElement('div'); wrap.className='pagewrap';
+  var pg=document.createElement('div'); pg.className='page';
+  var c=document.createElement('div'); c.className='content';
+  pg.appendChild(c);
+  var cap=document.createElement('div'); cap.className='cap';
+  var lab=document.createElement('span'); lab.textContent='Page '+idx+' · A4';
+  var b=document.createElement('button'); b.type='button'; b.textContent='Download PNG';
+  b.addEventListener('click',function(){exportPage(pg,idx)});
+  cap.appendChild(lab); cap.appendChild(b);
+  wrap.appendChild(cap); wrap.appendChild(pg);
+  pagesEl.appendChild(wrap);
+  return c;
+}
+function over(c){ return c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1; }
+function applyVars(){
+  var r=document.documentElement.style;
+  r.setProperty('--cols',cols);
+  r.setProperty('--m',$('mar').value+'mm');
+  r.setProperty('--gap',$('gap').value+'mm');
+  r.setProperty('--fs',$('fs').value+'pt');
+  r.setProperty('--lh',$('lh').value);
+  r.setProperty('--nf',$('ff').value);
+  pagesEl.classList.toggle('cuts',$('cuts').checked);
+  $('marO').textContent=$('mar').value+'mm';
+  $('gapO').textContent=$('gap').value+'mm';
+  $('fsO').textContent=$('fs').value+'pt';
+  $('lhO').textContent=$('lh').value;
+  Array.prototype.forEach.call($('colseg').children,function(b){b.setAttribute('aria-pressed',String(+b.dataset.c===cols))});
+}
+function render(){
+  applyVars();
+  var text=src.value;
+  try{localStorage.setItem('mn-text2',text)}catch(e){}
+  pagesEl.innerHTML='';
+  var n=1, cur=newPage(n);
+  units(text).forEach(function(u){
+    var el=document.createElement('div');
+    if(u.img){
+      el.className='u im'; var im=document.createElement('img'); im.src=images[u.img].src;
+      im.style.width=images[u.img].w+'%'; el.appendChild(im);
+    } else {
+      el.className='u'+(u.h?' h':'')+(u.c?' c':''); el.innerHTML=u.html;
+    }
+    cur.appendChild(el);
+    if(u.img){
+      var im2=el.firstChild;
+      if(!im2.complete){ /* data URLs decode synchronously in practice */ }
+    }
+    if(over(cur) && cur.children.length>1){
+      cur.removeChild(el); n++; cur=newPage(n); cur.appendChild(el);
+    }
+  });
+  var words=(text.trim().match(/\S+/g)||[]).length;
+  $('stats').textContent='Words: '+words+' | Pages: '+n;
+  setZoom($('zoom').value);
+}
+function schedule(){ clearTimeout(timer); timer=setTimeout(render,150); }
+function setZoom(z){
+  z=+z; pagesEl.style.transform='scale('+z+')';
+  var h=pagesEl.scrollHeight;
+  pagesEl.style.marginBottom=(-(h*(1-z)))+'px';
+  pagesEl.style.marginRight=(-(793.7*(1-z)))+'px';
+  $('zoomO').textContent=Math.round(z*100)+'%';
+}
+function fit(){
+  var avail=stage.clientWidth-28;
+  var z=Math.max(0.3,Math.min(1.5,avail/793.7));
+  $('zoom').value=z; setZoom(z);
+}
+
+/* images */
+function refreshImgList(){
+  var box=$('imglist'); box.innerHTML='';
+  Object.keys(images).forEach(function(id){
+    var r=document.createElement('div'); r.className='imgrow';
+    var t=document.createElement('img'); t.src=images[id].src; t.alt='';
+    var c=document.createElement('code'); c.textContent='[img:'+id+']';
+    var s=document.createElement('select'); s.setAttribute('aria-label','Image '+id+' width');
+    [100,75,50,33].forEach(function(w){var o=document.createElement('option'); o.value=w; o.textContent=w+'%'; if(w===images[id].w)o.selected=true; s.appendChild(o);});
+    s.addEventListener('change',function(){images[id].w=+s.value; schedule();});
+    var d=document.createElement('button'); d.type='button'; d.textContent='Remove';
+    d.addEventListener('click',function(){
+      delete images[id];
+      src.value=src.value.split('\n').filter(function(l){return l.trim()!=='[img:'+id+']'}).join('\n');
+      refreshImgList(); schedule();
+    });
+    r.appendChild(t); r.appendChild(c); r.appendChild(s); r.appendChild(d); box.appendChild(r);
+  });
+}
+$('imgbtn').addEventListener('click',function(){$('imgin').click()});
+$('imgin').addEventListener('change',function(){
+  var files=Array.prototype.slice.call(this.files); var inp=this;
+  var pending=files.length; if(!pending) return;
+  var ins='';
+  files.forEach(function(f){
+    var fr=new FileReader();
+    fr.onload=function(){
+      var id=nextImg++; images[id]={src:fr.result,w:100};
+      ins+='\n[img:'+id+']\n';
+      if(--pending===0){
+        var p=src.selectionStart, v=src.value;
+        src.value=v.slice(0,p)+ins+v.slice(p);
+        refreshImgList(); render();
+      }
+    };
+    fr.onerror=function(){ if(--pending===0){refreshImgList(); render();} };
+    fr.readAsDataURL(f);
+  });
+  inp.value='';
+});
+
+src.addEventListener('input',schedule);
+['mar','gap','fs','lh','ff','cuts'].forEach(function(id){$(id).addEventListener('input',schedule)});
+$('colseg').addEventListener('click',function(e){var b=e.target.closest('button'); if(!b)return; cols=+b.dataset.c; schedule();});
+$('zoom').addEventListener('input',function(){setZoom(this.value)});
+$('fit').addEventListener('click',fit);
+$('clear').addEventListener('click',function(){src.value=''; images={}; refreshImgList(); render(); src.focus();});
+
+function wrapSel(o,c){
+  var s=src.selectionStart,t=src.selectionEnd,v=src.value;
+  src.value=v.slice(0,s)+o+v.slice(s,t)+c+v.slice(t);
+  src.setSelectionRange(s+o.length,t+o.length); src.focus(); schedule();
+}
+document.querySelector('.tools').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-w],button[data-h]'); if(!b) return;
+  if(b.dataset.h){
+    var s=src.selectionStart,t=src.selectionEnd,v=src.value;
+    var ls=v.lastIndexOf('\n',s-1)+1;
+    src.value=v.slice(0,ls)+'# '+v.slice(ls);
+    src.setSelectionRange(s+2,t+2); src.focus(); schedule();
+  } else { var p=b.dataset.w.split('|'); wrapSel(p[0],p[1]); }
+});
+$('applycol').addEventListener('click',function(){ wrapSel('[c='+$('col').value+']','[/c]'); });
+
+/* export: A4 at scale 4 = about 3175 x 4490 px (about 400 dpi) */
+var lastBlob=null, lastName='', lastIsImg=false, dlg=$('dlg');
+var SCALE=4;
+function shot(pg){
+  return html2canvas(pg,{scale:SCALE,backgroundColor:'#ffffff',useCORS:true,logging:false,
+    onclone:function(d){var p=d.getElementById('pages'); if(p){p.style.transform='none';p.style.margin='0'}}});
+}
+var dlCap=null;
+try{ if(window.claude&&window.claude.use){ window.claude.use('downloads').then(function(d){dlCap=d}).catch(function(){}); } }catch(e){}
+function saveBlob(blob,name){
+  if(dlCap){
+    dlCap.save({filename:name,data:blob}).then(function(){$('dmsg').textContent='Saved '+name+'.'})
+      .catch(function(e){ $('dmsg').textContent=(e&&e.code==='declined')?'Save cancelled.':'Saving is not available in this view. Use the standalone file.'; });
+    return;
+  }
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function openDlg(title,isImg){
+  $('dtitle').textContent=title; $('dimg').hidden=!isImg; $('copyimg').hidden=!isImg;
+  $('dobtn').disabled=true; lastBlob=null; lastIsImg=isImg;
+  if(!dlg.open) dlg.showModal();
+}
+var HELP=' If no file was saved, this viewer blocks downloads: ';
+function exportPage(pg,idx){
+  openDlg('Page '+idx+' · A4 PNG',true); $('dmsg').textContent='Rendering at high resolution...'; $('dimg').removeAttribute('src');
+  if(typeof html2canvas!=='function'){ $('dmsg').textContent='Image export could not load. Check your connection and reload.'; return; }
+  shot(pg).then(function(cv){
+    cv.toBlob(function(b){
+      lastBlob=b; lastName='micro-notes-page-'+idx+'.png';
+      $('dimg').src=URL.createObjectURL(b); $('dobtn').disabled=false;
+      $('dmsg').textContent='Ready: '+cv.width+' × '+cv.height+' px. Press Download.'+HELP+'long-press or right-click the image to save, or open the standalone file.';
+    },'image/png');
+  }).catch(function(){ $('dmsg').textContent='Could not render this page as an image.'; });
+}
+$('dlpdf').addEventListener('click',function(){
+  openDlg('A4 PDF',false); $('dmsg').textContent='Preparing pages...';
+  if(typeof html2canvas!=='function'||!window.jspdf){ $('dmsg').textContent='PDF export could not load. Check your connection and reload.'; return; }
+  var pgs=Array.prototype.slice.call(pagesEl.querySelectorAll('.page'));
+  var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait',compress:true});
+  var i=0;
+  (function next(){
+    if(i>=pgs.length){
+      lastBlob=pdf.output('blob'); lastName='micro-notes.pdf'; $('dobtn').disabled=false;
+      $('dmsg').textContent=pgs.length+' A4 page(s) ready. Press Download.'+HELP.replace('long-press or right-click the image to save, or ','')+'open the standalone file.';
+      return;
+    }
+    $('dmsg').textContent='Rendering page '+(i+1)+' of '+pgs.length+'...';
+    shot(pgs[i]).then(function(cv){
+      if(i>0) pdf.addPage('a4','portrait');
+      pdf.addImage(cv.toDataURL('image/png'),'PNG',0,0,210,297,undefined,'FAST');
+      i++; setTimeout(next,20);
+    }).catch(function(){ $('dmsg').textContent='Could not render page '+(i+1)+'.'; });
+  })();
+});
+$('dobtn').addEventListener('click',function(){ if(lastBlob) saveBlob(lastBlob,lastName); });
+$('copyimg').addEventListener('click',function(){
+  if(!lastBlob||!lastIsImg) return;
+  try{
+    navigator.clipboard.write([new ClipboardItem({'image/png':lastBlob})])
+      .then(function(){$('dmsg').textContent='Copied. Paste it into a document or chat.'})
+      .catch(function(){$('dmsg').textContent='Copy is blocked here. Save the image from the preview instead.'});
+  }catch(e){ $('dmsg').textContent='Copy is blocked here. Save the image from the preview instead.'; }
+});
+$('closed').addEventListener('click',function(){dlg.close()});
+
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){render()})}
+refreshImgList(); render(); fit();
+window.addEventListener('resize',function(){ if(window.innerWidth<900) fit(); });
+})();
+</script>
+
+</body></html>
